@@ -1,66 +1,73 @@
+
 /* 
-  NFC_Module_for_Arduino_(SKU:DFR0231) sample code.
+  Adapted from NFC_Module_for_Arduino_(SKU:DFR0231) sample code.
   https://www.dfrobot.com/wiki/index.php/NFC_Module_for_Arduino_(SKU:DFR0231)
 
- # Editor : Adrian
- # Date   : 2013.04.18
- # Ver    : 0.1
  # Product: NFC Module for Arduino
  # SKU    : DFR0231
-   
- # Description:     
- # When the a card close to the device , the PC will receive the data 
- # Connect the NFC Card's TXD, RXD, GND, +3.3V to Nano's D0RX, D1TX, GND, +3.3V
- # Or connect the NFC Card's TXD, RXD, GND, +5V to Nano's D0RX, D1TX, GND, +5V
+ # Ver    : 0.2
+ #
+ # Editor : Adrian
+ # Date   : 2013.04.18 | v0.1
+ #
+ # Editor : @sleepdefic1t
+ # Date   : 2017.10.05 | v0.2
+ #
 
- 
- PN532 reads the tag by Arduino mega/Leonardo
+--
  command list:
- 
- #wake up reader
- send: 55 55 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ff 03 fd d4 14 01 17 00
- return: 00 00 FF 00 FF 00 00 00 FF 02 FE D5 15 16 00
- 
- #get firmware
- send: 00 00 FF 02 FE D4 02 2A 00
- return: 00 00 FF 00 FF 00 00 00 FF 06 FA D5 03 32 01 06 07 E8 00
- 
- #read the tag
- send: 00 00 FF 04 FC D4 4A 01 00 E1 00
- return: 00 00 FF 00 FF 00 00 00 FF 0C F4 D5 4B 01 01 00 04 08 04 XX XX XX XX 5A 00
- XX is tag.
- 
+
+     # wake up reader
+     send: 55 55 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ff 03 fd d4 14 01 17 00
+     return: 00 00 FF 00 FF 00 00 00 FF 02 FE D5 15 16 00
+
+     # get firmware
+     send: 00 00 FF 02 FE D4 02 2A 00
+     return: 00 00 FF 00 FF 00 00 00 FF 06 FA D5 03 32 01 06 07 E8 00
+
+     # read the tag
+     send: 00 00 FF 04 FC D4 4A 01 00 E1 00
+     return: 00 00 FF 00 FF 00 00 00 FF 0C F4 D5 4B 01 01 00 04 08 04 XX XX XX XX 5A 00
+     # 'XX' is tag.
+ --
+
  */
+
+#include <SoftwareSerial.h>
+
+SoftwareSerial serial1(3, 2);   // NFC-RX > Arduino pin3  | NFC-TX > Arduino pin2
 
 const unsigned char wake[24]={
   0x55, 0x55, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, \
-0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0x03, 0xfd, 0xd4, 0x14, 0x01, 0x17, 0x00};//wake up NFC module
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0x03, 0xfd, 0xd4, 0x14, 0x01, 0x17, 0x00};  //wake up NFC module
+
 const unsigned char firmware[9]={
-  0x00, 0x00, 0xFF, 0x02, 0xFE, 0xD4, 0x02, 0x2A, 0x00};//
+  0x00, 0x00, 0xFF, 0x02, 0xFE, 0xD4, 0x02, 0x2A, 0x00};
+
 const unsigned char tag[11]={
-  0x00, 0x00, 0xFF, 0x04, 0xFC, 0xD4, 0x4A, 0x01, 0x00, 0xE1, 0x00};//detecting tag command
+  0x00, 0x00, 0xFF, 0x04, 0xFC, 0xD4, 0x4A, 0x01, 0x00, 0xE1, 0x00};  //detecting tag command
+
 const unsigned char std_ACK[25] = {
   0x00, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0x00, 0x00, 0xFF, 0x0C, \
 0xF4, 0xD5, 0x4B, 0x01, 0x01, 0x00, 0x04, 0x08, 0x04, 0x00, 0x00, 0x00, 0x00, 0x4b, 0x00};
-unsigned char old_id[5];
 
+unsigned char old_id[5];
 unsigned char receive_ACK[25];//Command receiving buffer
-//int inByte = 0;               //incoming serial byte buffer
 
 #if defined(ARDUINO) && ARDUINO >= 100
 #include "Arduino.h"
-#define print1Byte(args) Serial1.write(args)
-#define print1lnByte(args)  Serial1.write(args),Serial1.println()
+#define print1Byte(args) serial1.write(args)
+#define print1lnByte(args)  serial1.write(args),Serial1.println()
 #else
 #include "WProgram.h"
-#define print1Byte(args) Serial1.print(args,BYTE)
-#define print1lnByte(args)  Serial1.println(args,BYTE)
+#define print1Byte(args) serial1.print(args,BYTE)
+#define print1lnByte(args)  serial1.println(args,BYTE)
 #endif
 
+
 void setup(){
-  Serial.begin(9600);	// open serial with PC
-  Serial1.begin(115200);	//open serial1 with device
-  //Serial2.begin(115200);
+  Serial.begin(9600);  // open serial with PC
+  serial1.begin(115200);  //open serial1 with device
   wake_card();
   delay(100);
   read_ACK(15);
@@ -81,14 +88,14 @@ void loop(){
   copy_id ();
 }
 
-void copy_id (void) {//save old id
+void copy_id (void) { //save old id
   int ai, oi;
   for (oi=0, ai=19; oi<5; oi++,ai++) {
     old_id[oi] = receive_ACK[ai];
   }
 }
  
-char cmp_id (void){//return true if find id is old
+char cmp_id (void){ //return true if find id is old
   int ai, oi;
   for (oi=0,ai=19; oi<5; oi++,ai++) {
     if (old_id[oi] != receive_ACK[ai])
@@ -97,7 +104,7 @@ char cmp_id (void){//return true if find id is old
   return 1;
 }
 
-int test_ACK (void) {// return true if receive_ACK accord with std_ACK
+int test_ACK (void) { // return true if receive_ACK accord with std_ACK
   int i;
   for (i=0; i<19; i++) {
     if (receive_ACK[i] != std_ACK[i])
@@ -106,7 +113,7 @@ int test_ACK (void) {// return true if receive_ACK accord with std_ACK
   return 1;
 }
 
-void send_id (void) {//send id to PC
+void send_id (void) { //send id to PC
   int i;
   Serial.print ("ID: ");
   for (i=19; i<= 23; i++) {
@@ -116,46 +123,46 @@ void send_id (void) {//send id to PC
   Serial.println ();
 }
 
-void UART1_Send_Byte(unsigned char command_data){//send byte to device
+void UART1_Send_Byte(unsigned char command_data){ //send byte to device
   print1Byte(command_data);
 #if defined(ARDUINO) && ARDUINO >= 100
-  Serial1.flush();// complete the transmission of outgoing serial data 
+  serial1.flush();  // complete the transmission of outgoing serial data 
 #endif
 } 
 
-void UART_Send_Byte(unsigned char command_data){//send byte to PC
+void UART_Send_Byte(unsigned char command_data){  //send byte to PC
   Serial.print(command_data,HEX);
   Serial.print(" ");
 } 
 
-void read_ACK(unsigned char temp){//read ACK into reveive_ACK[]
+void read_ACK(unsigned char temp){  //read ACK into reveive_ACK[]
   unsigned char i;
   for(i=0;i<temp;i++) {
-    receive_ACK[i]= Serial1.read();
+    receive_ACK[i]= serial1.read();
   }
 }
 
-void wake_card(void){//send wake[] to device
+void wake_card(void){ //send wake[] to device
   unsigned char i;
   for(i=0;i<24;i++) //send command
     UART1_Send_Byte(wake[i]);
 }
 
-void firmware_version(void){//send fireware[] to device
+void firmware_version(void){  //send fireware[] to device
   unsigned char i;
-  for(i=0;i<9;i++) //send command
+  for(i=0;i<9;i++)  //send command
     UART1_Send_Byte(firmware[i]);
 }
 
-void send_tag(void){//send tag[] to device
+void send_tag(void){  //send tag[] to device
   unsigned char i;
   for(i=0;i<11;i++) //send command
     UART1_Send_Byte(tag[i]);
 }
 
-void display(unsigned char tem){//send receive_ACK[] to PC
+void display(unsigned char tem){  //send receive_ACK[] to PC
   unsigned char i;
-  for(i=0;i<tem;i++) //send command
+  for(i=0;i<tem;i++)  //send command
     UART_Send_Byte(receive_ACK[i]);
   Serial.println();
 }
